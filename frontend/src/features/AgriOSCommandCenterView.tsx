@@ -7,8 +7,9 @@ import {
   Sliders, ArrowRight, ShieldAlert, Ban, Info, Sparkles, X
 } from 'lucide-react';
 import { 
-  KAFKA_TOPICS, DOMAIN_AGENTS_INITIAL, INITIAL_REVIEWS, 
-  EVENT_CAUSAL_PATTERNS, KafkaTopic, DomainAgent, AgriEvent, ReviewItem 
+  FALLBACK_KAFKA_TOPICS, FALLBACK_DOMAIN_AGENTS, FALLBACK_INITIAL_REVIEWS, 
+  EVENT_CAUSAL_PATTERNS, KafkaTopic, DomainAgent, AgriEvent, ReviewItem, SystemStatus,
+  fetchAgriOsStatus, fetchAgriOsTopics, fetchAgriOsAgents, fetchAgriOsEvents, fetchAgriOsReviewQueue
 } from '../services/agriOsEventService';
 import { AgriOSIntelligenceGraph } from '../components/AgriOSIntelligenceGraph';
 import { AgriOSArchitectureModal } from '../components/AgriOSArchitectureModal';
@@ -21,7 +22,9 @@ export const AgriOSCommandCenterView: React.FC = () => {
   const [eventsProcessed, setEventsProcessed] = useState<number>(34821);
   const [lastEventAgo, setLastEventAgo] = useState<number>(1.2);
   const [events, setEvents] = useState<AgriEvent[]>([]);
-  const [agents, setAgents] = useState<DomainAgent[]>(DOMAIN_AGENTS_INITIAL);
+  const [agents, setAgents] = useState<DomainAgent[]>(FALLBACK_DOMAIN_AGENTS);
+  const [topics, setTopics] = useState<KafkaTopic[]>(FALLBACK_KAFKA_TOPICS);
+  const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
   const [selectedDomain, setSelectedDomain] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   
@@ -33,13 +36,15 @@ export const AgriOSCommandCenterView: React.FC = () => {
   const [isGraphModalOpen, setIsGraphModalOpen] = useState<boolean>(false);
   const [showAllEventsMobile, setShowAllEventsMobile] = useState<boolean>(false);
   
-  const [reviewCount, setReviewCount] = useState<number>(INITIAL_REVIEWS.length);
+  const [reviewCount, setReviewCount] = useState<number>(FALLBACK_INITIAL_REVIEWS.length);
 
   const patternIndexRef = useRef<number>(0);
   const stepIndexRef = useRef<number>(0);
 
   useEffect(() => {
-    const initialEvts: AgriEvent[] = [
+    let isMounted = true;
+
+    const fallbackEvts: AgriEvent[] = [
       {
         id: `evt-${Date.now() - 1200}`,
         timestamp: new Date(Date.now() - 1200).toTimeString().split(' ')[0],
@@ -96,7 +101,54 @@ export const AgriOSCommandCenterView: React.FC = () => {
         confidence: 91.8
       }
     ];
-    setEvents(initialEvts);
+    setEvents(fallbackEvts);
+
+    // Live status
+    fetchAgriOsStatus()
+      .then(st => {
+        if (!isMounted || !st) return;
+        setSystemStatus(st);
+        if (typeof st.eventsProcessed === 'number') {
+          setEventsProcessed(st.eventsProcessed);
+        }
+      })
+      .catch(err => console.warn('[AgriOS] Live status unavailable', err));
+
+    // Live agents
+    fetchAgriOsAgents()
+      .then(liveAgents => {
+        if (!isMounted || !liveAgents || liveAgents.length === 0) return;
+        setAgents(liveAgents);
+      })
+      .catch(err => console.warn('[AgriOS] Live agents unavailable', err));
+
+    // Live topics
+    fetchAgriOsTopics()
+      .then(liveTopics => {
+        if (!isMounted || !liveTopics || liveTopics.length === 0) return;
+        setTopics(liveTopics);
+      })
+      .catch(err => console.warn('[AgriOS] Live topics unavailable', err));
+
+    // Live events
+    fetchAgriOsEvents(20)
+      .then(liveEvts => {
+        if (!isMounted || !liveEvts || liveEvts.length === 0) return;
+        setEvents(liveEvts);
+      })
+      .catch(err => console.warn('[AgriOS] Live events unavailable', err));
+
+    // Live review queue count
+    fetchAgriOsReviewQueue()
+      .then(q => {
+        if (!isMounted || !q) return;
+        setReviewCount(q.length);
+      })
+      .catch(err => console.warn('[AgriOS] Live review queue count unavailable', err));
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -155,7 +207,11 @@ export const AgriOSCommandCenterView: React.FC = () => {
   }, []);
 
   const handleReplay = () => {
-    setEventsProcessed(34821);
+    fetchAgriOsStatus()
+      .then(st => {
+        if (st?.eventsProcessed) setEventsProcessed(st.eventsProcessed);
+      })
+      .catch(() => setEventsProcessed(34821));
     stepIndexRef.current = 0;
     patternIndexRef.current = 0;
   };
@@ -170,7 +226,7 @@ export const AgriOSCommandCenterView: React.FC = () => {
     return matchesDomain && matchesSearch;
   });
 
-  const filteredTopics = KAFKA_TOPICS.filter(t => {
+  const filteredTopics = topics.filter(t => {
     const matchesDomain = selectedDomain === 'ALL' || t.domain === selectedDomain;
     const matchesSearch = t.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           t.description.toLowerCase().includes(searchQuery.toLowerCase());
@@ -261,13 +317,13 @@ export const AgriOSCommandCenterView: React.FC = () => {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 text-charcoal">
         <div className="bg-white p-3.5 rounded-2xl border border-agriBorder shadow-sm">
           <span className="text-[10px] font-bold uppercase text-charcoal-muted block">Autonomous Agents</span>
-          <span className="text-xl sm:text-2xl font-black text-forest block mt-0.5">24 Active</span>
+          <span className="text-xl sm:text-2xl font-black text-forest block mt-0.5">{agents.length} Active</span>
           <span className="text-[10px] text-agriGreen font-bold block">100% Operational</span>
         </div>
 
         <div className="bg-white p-3.5 rounded-2xl border border-agriBorder shadow-sm">
           <span className="text-[10px] font-bold uppercase text-charcoal-muted block">Kafka Topics</span>
-          <span className="text-xl sm:text-2xl font-black text-charcoal block mt-0.5">{KAFKA_TOPICS.length} Topics</span>
+          <span className="text-xl sm:text-2xl font-black text-charcoal block mt-0.5">{topics.length} Topics</span>
           <span className="text-[10px] text-charcoal-muted block">10 Domain Groups</span>
         </div>
 

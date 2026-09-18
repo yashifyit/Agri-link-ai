@@ -14,6 +14,8 @@ from app.algorithms.engine import (
     calculate_net_realization, calculate_buyer_match_score,
     generate_ai_sale_recommendation
 )
+from app.services.mandi_service import get_live_mandi_prices
+
 
 SYSTEM_PROMPT = """You are KisanLink AI, an intelligent agricultural market intelligence assistant for Indian farmers, FPOs, and buyers.
 
@@ -264,21 +266,45 @@ def execute_tool_call(tool_name: str, args: Dict[str, Any], user_role: str, user
     if tool_name == "get_current_market_prices":
         crop = args.get("crop", "Tomato")
         prices = db.query(MarketPrice, Market).join(Market, MarketPrice.market_id == Market.id).filter(MarketPrice.crop_name.ilike(f"%{crop}%")).all()
+        db_price_list = [
+            {
+                "market": m.name,
+                "district": m.district,
+                "modal_price": p.modal_price,
+                "min_price": p.min_price,
+                "max_price": p.max_price,
+                "arrival_qty_tons": p.arrival_qty_tons,
+                "updated_at": p.updated_at.strftime("%d %b %Y, %I:%M %p")
+            }
+            for p, m in prices
+        ]
+        
+        # Enrich with verified live mandi prices from CommodityOnline
+        live_mandis = get_live_mandi_prices(commodity=crop)
+        live_mandi_list = [
+            {
+                "market": lm["market"],
+                "district": lm["district"],
+                "state": lm["state"],
+                "modal_price": lm["modal_price"],
+                "modal_price_per_kg": lm["price_per_kg"],
+                "min_price": lm["min_price"],
+                "max_price": lm["max_price"],
+                "arrival_qty_tons": lm["arrival_tons"],
+                "trend": lm["trend"],
+                "source": "CommodityOnline (https://www.commodityonline.com/mandiprices)",
+                "updated_at": lm["updated_at"]
+            }
+            for lm in live_mandis
+        ]
+        
         return {
             "crop": crop,
-            "prices": [
-                {
-                    "market": m.name,
-                    "district": m.district,
-                    "modal_price": p.modal_price,
-                    "min_price": p.min_price,
-                    "max_price": p.max_price,
-                    "arrival_qty_tons": p.arrival_qty_tons,
-                    "updated_at": p.updated_at.strftime("%d %b %Y, %I:%M %p")
-                }
-                for p, m in prices
-            ]
+            "prices": db_price_list,
+            "live_mandi_benchmarks": live_mandi_list,
+            "source_attribution": "Today’s Mandi Prices, Market Rates in India (CommodityOnline: https://www.commodityonline.com/mandiprices)"
         }
+
 
     elif tool_name == "get_historical_market_prices":
         crop = args.get("crop", "Tomato")

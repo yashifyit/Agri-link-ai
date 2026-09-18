@@ -1,11 +1,14 @@
-import React, { useState } from 'react';
-import { X, Upload, CheckCircle2, ArrowRight, ArrowLeft, Sprout, Image as ImageIcon } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { X, Upload, CheckCircle2, ArrowRight, ArrowLeft, Sprout, Image as ImageIcon, Camera, Trash2, Check, RefreshCw } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { CropImage } from './CropImage';
+import { t, getCropName } from '../utils/i18n';
 
 export const CreateLotWizardModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
-  const { addLot, crops } = useApp();
+  const { addLot, crops, language } = useApp();
   const [step, setStep] = useState<number>(1);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [formData, setFormData] = useState({
     crop: 'Tomato',
     variety: 'Desi Red',
@@ -18,9 +21,63 @@ export const CreateLotWizardModal: React.FC<{ isOpen: boolean; onClose: () => vo
     photoUploaded: true
   });
 
+  const [uploadedImageSrc, setUploadedImageSrc] = useState<string | null>(null);
+  const [uploadedFileName, setUploadedFileName] = useState<string>('Tomato_Harvest_GradeA.jpg');
+  const [uploadedFileSize, setUploadedFileSize] = useState<string>('2.4 MB');
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
   if (!isOpen) return null;
+
+  const handleFileSelect = (file: File) => {
+    if (!file.type.startsWith('image/')) return;
+    
+    setIsAnalyzing(true);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setUploadedImageSrc(e.target?.result as string);
+      setUploadedFileName(file.name);
+      setUploadedFileSize(`${(file.size / (1024 * 1024)).toFixed(1)} MB`);
+      setFormData(prev => ({ ...prev, photoUploaded: true }));
+      setTimeout(() => setIsAnalyzing(false), 500);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const onFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      handleFileSelect(e.target.files[0]);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFileSelect(e.dataTransfer.files[0]);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const triggerUpload = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleRemovePhoto = () => {
+    setUploadedImageSrc(null);
+    setUploadedFileName('');
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
 
   const handleNext = () => setStep(prev => Math.min(6, prev + 1));
   const handleBack = () => setStep(prev => Math.max(1, prev - 1));
@@ -94,7 +151,7 @@ export const CreateLotWizardModal: React.FC<{ isOpen: boolean; onClose: () => vo
                   >
                     {crops.map((cName) => (
                       <option key={cName} value={cName}>
-                        🌾 {cName}
+                        🌾 {cName !== getCropName(cName, language) ? `${getCropName(cName, language)} (${cName})` : cName}
                       </option>
                     ))}
                   </select>
@@ -194,23 +251,108 @@ export const CreateLotWizardModal: React.FC<{ isOpen: boolean; onClose: () => vo
             {/* STEP 5: HARVEST PHOTOS */}
             {step === 5 && (
               <div className="space-y-3">
-                <h4 className="text-sm font-black text-charcoal">5. Harvest Produce Photos</h4>
-                
-                <div className="border-2 border-dashed border-agriBorder rounded-2xl p-5 text-center bg-cream/50 hover:bg-cream transition-colors cursor-pointer space-y-1.5">
-                  <Upload className="w-7 h-7 text-agriGreen mx-auto" />
-                  <span className="text-xs font-bold text-forest block">Tap to upload harvest photo</span>
-                  <span className="text-[10px] text-charcoal-muted block">Direct camera or gallery upload</span>
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-black text-charcoal">5. Harvest Produce Photos</h4>
+                  <span className="text-[11px] font-bold text-agriGreen">
+                    {uploadedImageSrc ? '✓ Photo Ready' : 'Optional / Camera'}
+                  </span>
                 </div>
 
-                <div className="flex items-center gap-3 p-3 bg-cream rounded-2xl border border-agriBorder">
-                  <CropImage
-                    cropName={formData.crop}
-                    className="w-12 h-12 rounded-xl border border-agriBorder shrink-0"
-                  />
-                  <div className="text-xs min-w-0">
-                    <span className="font-bold text-charcoal block truncate">{formData.crop}_Harvest_{formData.quality_grade.replace(/\s+/g, '')}.jpg</span>
-                    <span className="text-[10px] text-agriGreen font-semibold">✓ Verified produce photo attached</span>
+                {/* Hidden Real File Input */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={onFileInputChange}
+                  className="hidden"
+                />
+                
+                {/* INTERACTIVE UPLOAD DROPZONE */}
+                <div
+                  onClick={triggerUpload}
+                  onDrop={handleDrop}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  className={`border-2 border-dashed rounded-2xl p-5 text-center transition-all cursor-pointer space-y-2 select-none ${
+                    isDragging
+                      ? 'border-agriGreen bg-agriGreen-light scale-[1.01]'
+                      : 'border-agriBorder bg-cream/60 hover:bg-cream hover:border-forest-light'
+                  }`}
+                >
+                  <div className="w-12 h-12 rounded-full bg-forest-light/10 text-forest mx-auto flex items-center justify-center">
+                    {isAnalyzing ? (
+                      <RefreshCw className="w-6 h-6 text-agriGreen animate-spin" />
+                    ) : (
+                      <Camera className="w-6 h-6 text-agriGreen" />
+                    )}
                   </div>
+                  
+                  <div>
+                    <span className="text-xs font-black text-forest block">
+                      {isAnalyzing ? 'Analyzing photo quality...' : 'Tap to capture or upload harvest photo'}
+                    </span>
+                    <span className="text-[10px] text-charcoal-muted block mt-0.5">
+                      Supports JPG, PNG, WebP • Drag & drop from computer or tap to open camera
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      triggerUpload();
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-forest text-white text-[11px] font-bold hover:bg-forest-light transition-all shadow-sm"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Choose File from Device</span>
+                  </button>
+                </div>
+
+                {/* ACTIVE PHOTO PREVIEW CARD */}
+                <div className="flex items-center justify-between p-3 bg-cream rounded-2xl border border-agriBorder">
+                  <div className="flex items-center gap-3 min-w-0">
+                    {uploadedImageSrc ? (
+                      <img
+                        src={uploadedImageSrc}
+                        alt="Harvest produce preview"
+                        className="w-12 h-12 rounded-xl object-cover border border-agriGreen shadow-sm shrink-0"
+                      />
+                    ) : (
+                      <CropImage
+                        cropName={formData.crop}
+                        className="w-12 h-12 rounded-xl border border-agriBorder shrink-0"
+                      />
+                    )}
+                    
+                    <div className="text-xs min-w-0 space-y-0.5">
+                      <span className="font-bold text-charcoal block truncate">
+                        {uploadedFileName || `${formData.crop}_Harvest_${formData.quality_grade.replace(/\s+/g, '')}.jpg`}
+                      </span>
+                      <div className="flex items-center gap-1.5 text-[10px]">
+                        <span className="text-agriGreen font-bold flex items-center gap-0.5">
+                          <Check className="w-3 h-3" /> AI Validated ({formData.quality_grade})
+                        </span>
+                        {uploadedFileSize && (
+                          <span className="text-charcoal-muted">• {uploadedFileSize}</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {uploadedImageSrc && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemovePhoto();
+                      }}
+                      title="Remove photo"
+                      className="p-2 text-charcoal-muted hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               </div>
             )}

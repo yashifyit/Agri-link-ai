@@ -4,6 +4,8 @@ import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 
+import { AVAILABLE_LANGUAGES, getCropName, t } from '../utils/i18n';
+
 interface Message {
   role: 'user' | 'model';
   content: string;
@@ -34,37 +36,91 @@ export const KisanLinkAIAssistant: React.FC = () => {
 
   const API_BASE = 'http://localhost:8000/api/v1';
 
-  // Quick Action triggers helper
+  // Quick Action triggers helper for all 9 languages
   const getGreeting = () => {
     const name = user?.name || "Ramesh";
-    if (language === 'HI') return `नमस्ते, ${name}। आप क्या जानना चाहते हैं?`;
-    if (language === 'MR') return `नमस्कार, ${name}। तुम्हाला काय जाणून घ्यायचे आहे?`;
-    return `Good morning, ${name}. What would you like to know?`;
+    const greetings: Record<string, string> = {
+      HI: `नमस्ते, ${name}। आप आज क्या जानना चाहते हैं?`,
+      MR: `नमस्कार, ${name}। तुम्हाला आज काय जाणून घ्यायचे आहे?`,
+      PA: `ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ, ${name}। ਤੁਸੀਂ ਅੱਜ ਕੀ ਜਾਣਨਾ ਚਾਹੁੰਦੇ ਹੋ?`,
+      TE: `నమస్కారం, ${name}। మీరు ఈరోజు ఏమి తెలుసుకోవాలనుకుంటున్నారు?`,
+      TA: `வணக்கம், ${name}। இன்று நீங்கள் என்ன தெரிந்துகொள்ள விரும்புகிறீர்கள்?`,
+      GU: `નમસ્તે, ${name}। તમે આજે શું જાણવા માંગો છો?`,
+      KN: `ನಮಸ್ಕಾರ, ${name}। ನೀವು ಇಂದು ಏನು ತಿಳಿಯಲು ಬಯಸುತ್ತೀರಿ?`,
+      BN: `নমস্কার, ${name}। আপনি আজ কী জানতে চান?`,
+      EN: `Good day, ${name}. What would you like to know today?`
+    };
+    return greetings[language] || greetings.EN;
   };
 
   const getQuickActions = () => {
-    if (language === 'HI') {
-      return [
-        { label: "📈 आज के दाम", query: "आज टमाटर का भाव क्या है?" },
-        { label: "🏪 खरीदार खोजें", query: "मेरे टमाटर के लिए खरीदार खोजें।" },
-        { label: "💰 क्या मैं अभी बेचूं?", query: "क्या मुझे आज अपने टमाटर बेचने चाहिए?" },
-        { label: "🌾 फसल सलाह लें", query: "टमाटर की खेती के बारे में जानकारी दें।" }
-      ];
+    const cropName = getCropName(selectedCrop, language);
+    
+    switch (language) {
+      case 'HI':
+        return [
+          { label: "📈 आज के मंडी भाव", query: `आज मेरे पास ${cropName} का ताजा भाव क्या है?` },
+          { label: "🏪 सत्यापित खरीदार खोजें", query: `मेरे 2 टन ${cropName} के लिए सर्वोत्तम सत्यापित खरीदार खोजें।` },
+          { label: "💰 क्या मैं अभी बेचूं?", query: `क्या मुझे आज अपना ${cropName} लॉट बेचना चाहिए या रुकना चाहिए?` },
+          { label: "🌾 फसल सलाह व ग्रेड", query: `${cropName} की गुणवत्ता ग्रेड और अधिकतम लाभ के सुझाव दें।` }
+        ];
+      case 'MR':
+        return [
+          { label: "📈 आजचे बाजारभाव", query: `माझ्या जवळ ${cropName} चा आजचा बाजारभाव काय आहे?` },
+          { label: "🏪 खरेदीदार शोधा", query: `माझ्या 2 टन ${cropName} पिकासाठी सर्वोत्तम पडताळलेले खरेदीदार शोधा.` },
+          { label: "💰 मी आता विकू का?", query: `मी आज ${cropName} विकावे की थांबावे?` },
+          { label: "🌾 पीक सल्ला व ग्रेड", query: `${cropName} ची प्रत आणि बाजारपेठ नफा वाढवण्यासाठी टिप्स सांगा.` }
+        ];
+      case 'PA':
+        return [
+          { label: "📈 ਅੱਜ ਦੇ ਮੰਡੀ ਭਾਅ", query: `ਅੱਜ ਨੇੜੇ ਦੀ ਮੰਡੀ ਵਿੱਚ ${cropName} ਦਾ ਭਾਅ ਕੀ ਹੈ?` },
+          { label: "🏪 ਖਰੀਦਦਾਰ ਲੱਭੋ", query: `ਮੇਰੇ 2 ਟਨ ${cropName} ਲਈ ਪ੍ਰਮਾਣਿਤ ਖਰੀਦਦਾਰ ਲੱਭੋ।` },
+          { label: "💰 ਕੀ ਮੈਂ ਹੁਣ ਵੇਚਾਂ?", query: `ਕੀ ਮੈਨੂੰ ਅੱਜ ${cropName} ਵੇਚਣਾ ਚਾਹੀਦਾ ਹੈ ਜਾਂ ਰੁਕਣਾ ਚਾਹੀਦਾ ਹੈ?` },
+          { label: "🌾 ਫ਼ਸਲ ਸਲਾਹ ਤੇ ਗ੍ਰੇਡ", query: `${cropName} ਲਈ ਗੁਣਵੱਤਾ ਸੁਧਾਰ ਅਤੇ ਲਾਭ ਵਧਾਉਣ ਦੇ ਸੁਝਾਅ ਦਿਓ।` }
+        ];
+      case 'TE':
+        return [
+          { label: "📈 నేటి మార్కెట్ ధరలు", query: `నా సమీపంలో ${cropName} నేటి ధర ఎంత?` },
+          { label: "🏪 కొనుగోలుదారులను వెతకండి", query: `నా 2 టన్నుల ${cropName} కోసం ధృవీకరించబడిన కొనుగోలుదారులను చూపించండి.` },
+          { label: "💰 నేను ఇప్పుడే అమ్మవచ్చా?", query: `నేను ఈరోజు ${cropName} అమ్మాలా లేక వేచి ఉండాలా?` },
+          { label: "🌾 పంట సలహాలు & గ్రేడ్లు", query: `${cropName} నాణ్యతా ప్రమాణాలు మరియు లాభాల చిట్కాలు చెప్పండి.` }
+        ];
+      case 'TA':
+        return [
+          { label: "📈 இன்றைய சந்தை விலைகள்", query: `அருகிலுள்ள சந்தையில் ${cropName} இன்றைய விலை என்ன?` },
+          { label: "🏪 வாங்குபவர்களைக் கண்டறியவும்", query: `எனது 2 டன் ${cropName} பயிருக்கு சரிபார்க்கப்பட்ட வாங்குபவர்களைக் கண்டறியவும்.` },
+          { label: "💰 இப்போது விற்கலாமா?", query: `நான் இன்று ${cropName} விற்க வேண்டுமா அல்லது காத்திருக்க வேண்டுமா?` },
+          { label: "🌾 பயிர் வழிகாட்டி & தரம்", query: `${cropName} தரத்தை மேம்படுத்தி அதிக லாபம் பெறுவதற்கான குறிப்புகள்.` }
+        ];
+      case 'GU':
+        return [
+          { label: "📈 આજના બજાર ભાવો", query: `મારી નજીકના બજારમાં ${cropName} નો આજનો ભાવ શું છે?` },
+          { label: "🏪 ખરીદદાર શોધો", query: `મારા 2 ટન ${cropName} માટે ચકાસાયેલ ખરીદદારો શોધો.` },
+          { label: "💰 શું હું અત્યારે વેચું?", query: `શું મારે આજે ${cropName} વેચવું જોઈએ કે રાહ જોવી?` },
+          { label: "🌾 પાક સલાહ અને ગ્રેડ", query: `${cropName} ની ગુણવત્તા સુધારવા અને વધુ નફો મેળવવાની ટીપ્સ.` }
+        ];
+      case 'KN':
+        return [
+          { label: "📈 ಇಂದಿನ ಮಾರುಕಟ್ಟೆ ದರಗಳು", query: `ನನ್ನ ಹತ್ತಿರದ ಮಾರುಕಟ್ಟೆಯಲ್ಲಿ ${cropName} ಇಂದಿನ ಬೆಲೆ ಎಷ್ಟು?` },
+          { label: "🏪 ಖರೀದಿದಾರರನ್ನು ಹುಡುಕಿ", query: `ನನ್ನ 2 ಟನ್ ${cropName} ಬೆಳೆಗೆ ಪರಿಶೀಲಿಸಿದ ಖರೀದಿದಾರರನ್ನು ಹುಡುಕಿ.` },
+          { label: "💰 ನಾನು ಈಗಲೇ ಮಾರಬೇಕೇ?", query: `ನಾನು ಇಂದು ${cropName} ಮಾರಾಟ ಮಾಡಬೇಕೇ ಅಥವಾ ಕಾಯಬೇಕೇ?` },
+          { label: "🌾 ಬೆಳೆ ಮಾಹಿತಿ & ಗ್ರೇಡ್‌ಗಳು", query: `${cropName} ಗುಣಮಟ್ಟ ಮತ್ತು ಲಾಭ ಹೆಚ್ಚಿಸುವ ಸಲಹೆಗಳು.` }
+        ];
+      case 'BN':
+        return [
+          { label: "📈 আজকের বাজার দর", query: `আমার নিকটবর্তী বাজারে ${cropName} এর আজকের দর কত?` },
+          { label: "🏪 ক্রেতা খুঁজুন", query: `আমার ২ টন ${cropName} এর জন্য যাচাইকৃত ক্রেতা খুঁজুন।` },
+          { label: "💰 আমি কি এখনই বিক্রি করব?", query: `আজ কি আমার ${cropName} বিক্রি করা উচিত নাকি অপেক্ষা করা উচিত?` },
+          { label: "🌾 ফসল পরামর্শ ও গ্রেড", query: `${cropName} এর গুণমান ও সর্বোচ্চ মুনাফার পরামর্শ দিন।` }
+        ];
+      default:
+        return [
+          { label: "📈 Today's Mandi Prices", query: `What is today's benchmark price of ${selectedCrop} near me?` },
+          { label: "🏪 Find Verified Buyers", query: `Find verified corporate & retail buyers for 2 tons of ${selectedCrop}.` },
+          { label: "💰 Should I Sell Now?", query: `Should I sell my ${selectedCrop} lot today or hold for 3 days?` },
+          { label: "🌾 Crop Quality & Grades", query: `What quality grade standards maximize net realization for ${selectedCrop}?` }
+        ];
     }
-    if (language === 'MR') {
-      return [
-        { label: "📈 आजचे बाजारभाव", query: "आज टोमॅटोचा बाजारभाव किती आहे?" },
-        { label: "🏪 खरेदीदार शोधा", query: "माझ्या टोमॅटो पिकासाठी खरेदीदार शोधा।" },
-        { label: "💰 मी आता विकू का?", query: "मी आज टोमॅटो विकायला हवेत का?" },
-        { label: "🌾 पीक सल्ला घ्या", query: "टोमॅटो पिकाबद्दल माहिती सांगा।" }
-      ];
-    }
-    return [
-      { label: "📈 Today's Mandi Prices", query: `What is the today's price of ${selectedCrop} near me?` },
-      { label: "🏪 Find Best Buyer", query: `Find me verified buyers for 2 tons of ${selectedCrop}.` },
-      { label: "💰 Should I Sell Now?", query: `Should I sell my ${selectedCrop} lot today?` },
-      { label: "🌾 Crop Guide & Grades", query: `What quality grade and agronomical tips should I target for ${selectedCrop}?` }
-    ];
   };
 
   // Fetch previous conversations
@@ -408,8 +464,8 @@ export const KisanLinkAIAssistant: React.FC = () => {
                   <span></span>
                 )}
                 
-                <span className="text-[10px] font-bold text-agriGreen/70 flex items-center gap-1">
-                  <Globe className="w-3.5 h-3.5" /> Language: {language === 'HI' ? 'हिंदी' : language === 'MR' ? 'मराठी' : 'English'}
+                <span className="text-[10px] font-bold text-agriGreen/80 flex items-center gap-1">
+                  <Globe className="w-3.5 h-3.5" /> {AVAILABLE_LANGUAGES.find(l => l.code === language)?.nativeName || language} ({language})
                 </span>
               </div>
 
@@ -425,13 +481,7 @@ export const KisanLinkAIAssistant: React.FC = () => {
                   type="text"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder={
-                    language === 'HI'
-                      ? 'किसानलिंक एआई से कुछ भी पूछें...'
-                      : language === 'MR'
-                      ? 'किसानलिंक एआय ला काहीही विचारा...'
-                      : 'Ask KisanLink AI anything...'
-                  }
+                  placeholder={t('askAssistant', language)}
                   disabled={isThinking}
                   className="flex-1 bg-cream px-4 py-3 rounded-2xl text-xs font-medium text-charcoal placeholder-charcoal-muted border border-agriBorder focus:outline-none focus:border-forest shadow-inner"
                 />

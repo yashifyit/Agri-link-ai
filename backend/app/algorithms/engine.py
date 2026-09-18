@@ -69,7 +69,7 @@ def calculate_buyer_match_score(
     buyer_g_val = grades.get(buyer_grade_pref, 2)
     qty_grade_score = 1.0 if lot_g_val >= buyer_g_val else 0.6
     
-    # 4. Price Match
+    # 4. Price
     if buyer_offered_price >= lot_expected_price:
         price_score = 1.0
     else:
@@ -79,9 +79,10 @@ def calculate_buyer_match_score(
     # 5. Distance Score (decay over 100km)
     distance_score = max(0.1, min(1.0, 1.0 - (distance_km / 200.0)))
     
-    # 6. Reliability & Payment Score
+    # 6. Reliability & Payment Score.
     reliability_score = buyer_reliability_pct / 100.0
-    payment_score = buyer_on_time_pay_pct / 100.0
+    payment_score = buyer_on_time_pay_pct / 100.0 
+    
     
     total_score = (
         0.25 * crop_match +
@@ -104,6 +105,7 @@ def calculate_buyer_match_score(
         reasons.append(f"Proximity advantage ({distance_km} km)")
     if buyer_reliability_pct >= 90:
         reasons.append(f"High buyer reliability ({buyer_reliability_pct}%)")
+
         
     return {
         "match_percentage": match_pct,

@@ -1,16 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, ArrowUpDown, TrendingUp, ChevronRight, Eye, Sparkles, MapPin } from 'lucide-react';
+import { Search, Filter, ArrowUpDown, TrendingUp, ChevronRight, Eye, Sparkles, MapPin, Activity, LayoutGrid } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { PriceTrendChart } from '../components/PriceTrendChart';
 import { CropDetailModal } from '../components/CropDetailModal';
 import { CropImage } from '../components/CropImage';
 import { MaharashtraMap } from '../components/MaharashtraMap';
+import { LiveMandiPricesMonitor } from '../components/LiveMandiPricesMonitor';
 import { CROPS_CATALOG, CropItem } from '../data/crops';
+import { t, getCropName } from '../utils/i18n';
 
 export const MarketIntelligenceView: React.FC = () => {
-  const { prices } = useApp();
+  const { prices, language } = useApp();
+  const [activeSubTab, setActiveSubTab] = useState<'live-mandi' | 'catalog'>('live-mandi');
   const [selectedCrop, setSelectedCrop] = useState<CropItem>(CROPS_CATALOG[0]);
   const [selectedDetailCrop, setSelectedDetailCrop] = useState<CropItem | null>(null);
+
   
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -50,12 +54,44 @@ export const MarketIntelligenceView: React.FC = () => {
   return (
     <div className="space-y-5 pb-8 text-charcoal">
       
-      {/* 1. MOBILE MARKETPLACE SEARCH & CATEGORIES */}
-      <div className="bg-white p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-agriBorder shadow-card space-y-3.5">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-black text-charcoal">Live Commodity Marketplace</h1>
-          <p className="text-xs text-charcoal-muted mt-0.5">Explore 55+ crops with verified mandi rates & direct buyer bids</p>
-        </div>
+      {/* VIEW SWITCHER SUB-NAV */}
+      <div className="bg-white p-2 rounded-2xl border border-agriBorder shadow-sm flex gap-2">
+        <button
+          onClick={() => setActiveSubTab('live-mandi')}
+          className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+            activeSubTab === 'live-mandi'
+              ? 'bg-forest text-white shadow-sm'
+              : 'bg-cream text-charcoal hover:bg-cream-dark border border-agriBorder'
+          }`}
+        >
+          <Activity className="w-4 h-4 text-agriGreen" />
+          <span>Today’s Mandi Prices (Live APMC Data)</span>
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('catalog')}
+          className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+            activeSubTab === 'catalog'
+              ? 'bg-forest text-white shadow-sm'
+              : 'bg-cream text-charcoal hover:bg-cream-dark border border-agriBorder'
+          }`}
+        >
+          <LayoutGrid className="w-4 h-4 text-forest" />
+          <span>55+ Commodity Catalog & Net Realization</span>
+        </button>
+      </div>
+
+      {activeSubTab === 'live-mandi' ? (
+        <LiveMandiPricesMonitor />
+      ) : (
+        <div className="space-y-5">
+          {/* 1. MOBILE MARKETPLACE SEARCH & CATEGORIES */}
+          <div className="bg-white p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-agriBorder shadow-card space-y-3.5">
+            <div>
+              <h1 className="text-xl sm:text-2xl font-black text-charcoal">Live Commodity Marketplace</h1>
+              <p className="text-xs text-charcoal-muted mt-0.5">Explore 55+ crops with verified mandi rates & direct buyer bids</p>
+            </div>
+
 
         {/* Search Bar */}
         <div className="relative">
@@ -124,10 +160,10 @@ export const MarketIntelligenceView: React.FC = () => {
               <div className="p-3.5 space-y-2.5">
                 <div>
                   <h3 className="text-base font-black text-charcoal group-hover:text-forest transition-colors truncate">
-                    {crop.name}
+                    {getCropName(crop.name, language)}
                   </h3>
                   <span className="text-[11px] text-charcoal-muted block truncate font-medium">
-                    {crop.hindiName} • {crop.marathiName || crop.category}
+                    {crop.name !== getCropName(crop.name, language) ? `${crop.name} • ` : ''}{crop.category}
                   </span>
                 </div>
 
@@ -225,6 +261,10 @@ export const MarketIntelligenceView: React.FC = () => {
         onSellCrop={() => setSelectedDetailCrop(null)}
       />
 
+        </div>
+      )}
+
     </div>
   );
 };
+

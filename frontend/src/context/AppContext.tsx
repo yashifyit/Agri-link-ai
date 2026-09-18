@@ -1,9 +1,12 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import {
   UserRole, Language, LotItem, BuyerRequirementItem, OfferItem, OfferStatus,
-  TransactionItem, DisputeItem, MarketPriceItem, AIRecommendationResult
+  TransactionItem, DisputeItem, MarketPriceItem, AIRecommendationResult,
+  OrderItem, CartModel, ShipmentItem, NotificationItem
 } from '../types';
 import { useAuth } from './AuthContext';
+import { realtimeWS } from '../services/websocketService';
+import { apiFetch as coreApiFetch } from '../services/apiClient';
 
 interface AppContextType {
   role: UserRole;
@@ -15,8 +18,14 @@ interface AppContextType {
   
   // Data State
   lots: LotItem[];
+  allLots: LotItem[];
   buyers: BuyerRequirementItem[];
   offers: OfferItem[];
+  orders: OrderItem[];
+  cart: CartModel | null;
+  shipments: ShipmentItem[];
+  notifications: NotificationItem[];
+  unreadNotificationCount: number;
   transactions: TransactionItem[];
   disputes: DisputeItem[];
   prices: MarketPriceItem[];
@@ -27,12 +36,21 @@ interface AppContextType {
   
   // API loading states
   isLoading: boolean;
+  isSyncing: boolean;
+  lastSyncTime: Date;
   refreshData: () => Promise<void>;
 
   // Actions
   addLot: (lot: Partial<LotItem>) => Promise<void>;
+  makeOffer: (lotId: string, offerPrice: number, quantityKg?: number) => Promise<void>;
   counterOffer: (offerId: string, counterPrice: number) => Promise<void>;
   acceptOffer: (offerId: string) => Promise<void>;
+  createOrderDirect: (lotId: string, quantityKg: number, deliveryAddress: string) => Promise<any>;
+  verifyPaymentOrder: (orderId: string, razorpayOrderId: string, razorpayPaymentId: string, signature: string) => Promise<boolean>;
+  updateShipmentMilestone: (shipmentId: string, status: string, note?: string) => Promise<void>;
+  addToCart: (lotId: string, quantityKg: number) => Promise<void>;
+  removeFromCart: (itemId: number) => Promise<void>;
+  markNotificationsRead: () => Promise<void>;
   addDispute: (dispute: Partial<DisputeItem>) => Promise<void>;
   addBuyerRequirement: (req: Partial<BuyerRequirementItem>) => Promise<void>;
 }
@@ -60,116 +78,181 @@ const initialRecommendation: AIRecommendationResult = {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-const API_BASE = 'http://localhost:8000/api/v1';
-
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, demoLogin } = useAuth();
+  const { user, token, demoLogin } = useAuth();
   const role = user?.role || 'FARMER';
   
   const setRole = (newRole: UserRole) => {
     demoLogin(newRole);
   };
 
-  const [language, setLanguage] = useState<Language>('EN');
+  const [language, setLanguageState] = useState<Language>(() => {
+    const saved = localStorage.getItem('kisanlink_language') as Language;
+    return saved && ['EN', 'HI', 'MR', 'PA', 'TE', 'TA', 'GU', 'KN', 'BN'].includes(saved) ? saved : 'EN';
+  });
+
+  const setLanguage = (lang: Language) => {
+    setLanguageState(lang);
+    localStorage.setItem('kisanlink_language', lang);
+  };
+
   const [currentTab, setCurrentTab] = useState<string>('landing');
   const [selectedCrop, setSelectedCrop] = useState<string>('Tomato');
   
   // Data State
   const [lots, setLots] = useState<LotItem[]>([]);
+  const [allLots, setAllLots] = useState<LotItem[]>([]);
   const [buyers, setBuyers] = useState<BuyerRequirementItem[]>([]);
   const [offers, setOffers] = useState<OfferItem[]>([]);
+  const [orders, setOrders] = useState<OrderItem[]>([]);
+  const [cart, setCart] = useState<CartModel | null>(null);
+  const [shipments, setShipments] = useState<ShipmentItem[]>([]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState<number>(0);
   const [transactions, setTransactions] = useState<TransactionItem[]>([]);
   const [disputes, setDisputes] = useState<DisputeItem[]>([]);
   const [prices, setPrices] = useState<MarketPriceItem[]>([]);
   const [recommendation, setRecommendation] = useState<AIRecommendationResult>(initialRecommendation);
-  const [crops, setCrops] = useState<string[]>(['Tomato', 'Onion', 'Wheat', 'Soybean', 'Mango']);
+  const [crops, setCrops] = useState<string[]>(['Tomato', 'Onion', 'Wheat', 'Soybean', 'Potato', 'Rice']);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const [lastSyncTime, setLastSyncTime] = useState<Date>(new Date());
 
-  // Helper fetch function
-  const apiFetch = async (path: string, options: RequestInit = {}) => {
-    const headers = {
-      'Content-Type': 'application/json',
-      'X-User-Role': user?.role || 'FARMER',
-      'X-User-Id': user?.id || '1',
-      ...(options.headers || {})
-    };
-    const response = await fetch(`${API_BASE}${path}`, { ...options, headers });
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({ detail: 'Unknown API error' }));
-      throw new Error(err.detail || `HTTP error ${response.status}`);
-    }
-    return response.json();
-  };
+  // Delegate to centralized apiClient — token attachment and base URL are handled there
+  const apiFetch = useCallback(async (path: string, options: RequestInit = {}) => {
+    return coreApiFetch(path, options);
+  }, []);
 
-  const refreshData = async () => {
-    setIsLoading(true);
+  const refreshData = useCallback(async (silent = false) => {
+    if (!silent) setIsLoading(true);
+    setIsSyncing(true);
     try {
-      // 1. Fetch prices based on selected crop
-      const fetchedPrices = await apiFetch(`/prices?crop=${selectedCrop}`);
+      // 1. Fetch prices
+      const fetchedPrices = await apiFetch(`/prices?crop=${selectedCrop}`).catch(() => []);
       setPrices(fetchedPrices);
 
-      // 2. Fetch lots, buyers, offers, transactions, disputes, crops
-      const [fetchedLots, fetchedBuyers, fetchedOffers, fetchedTransactions, fetchedDisputes, fetchedCrops] = await Promise.all([
-        apiFetch('/lots'),
-        apiFetch('/buyers'),
-        apiFetch('/offers'),
-        apiFetch('/transactions'),
-        apiFetch('/disputes'),
-        apiFetch('/crops')
+      // 2. Fetch parallel entities
+      const [fetchedLots, fetchedBuyers, fetchedOffers, fetchedOrders, fetchedShipments, fetchedDisputes, fetchedCrops, fetchedNotifs] = await Promise.all([
+        apiFetch('/lots').catch(() => []),
+        apiFetch('/buyers').catch(() => []),
+        apiFetch('/offers').catch(() => []),
+        apiFetch('/orders').catch(() => []),
+        apiFetch('/shipments').catch(() => []),
+        apiFetch('/disputes').catch(() => []),
+        apiFetch('/crops').catch(() => []),
+        apiFetch('/notifications').catch(() => ({ notifications: [], unread_count: 0 }))
       ]);
       
-      setCrops(fetchedCrops.map((c: any) => c.name));
+      if (fetchedCrops.length > 0) {
+        setCrops(fetchedCrops.map((c: any) => c.name));
+      }
+      setAllLots(fetchedLots);
 
-      // Filter lots for Farmer role to ensure personalization
+      // Filter lots for Farmer
       if (role === 'FARMER' && user) {
-        setLots(fetchedLots.filter((l: any) => l.farmer_name.toLowerCase() === user.name.toLowerCase()));
+        setLots(fetchedLots.filter((l: any) => l.farmer_name?.toLowerCase() === user.name?.toLowerCase()));
       } else {
         setLots(fetchedLots);
       }
 
-      // Filter offers for Farmer to only see their lots' offers
-      if (role === 'FARMER' && user) {
-        const farmerLotIds = fetchedLots
-          .filter((l: any) => l.farmer_name.toLowerCase() === user.name.toLowerCase())
-          .map((l: any) => l.id);
-        setOffers(fetchedOffers.filter((o: any) => farmerLotIds.includes(o.lot_id)));
-      } else if (role === 'BUYER' && user) {
-        setOffers(fetchedOffers.filter((o: any) => o.buyer_name.toLowerCase() === user.name.toLowerCase()));
-      } else {
-        setOffers(fetchedOffers);
-      }
-
-      // Filter transactions
-      if (role === 'FARMER' && user) {
-        setTransactions(fetchedTransactions.filter((t: any) => t.farmer_name.toLowerCase() === user.name.toLowerCase()));
-      } else if (role === 'BUYER' && user) {
-        setTransactions(fetchedTransactions.filter((t: any) => t.buyer_name.toLowerCase() === user.name.toLowerCase()));
-      } else {
-        setTransactions(fetchedTransactions);
-      }
-
       setBuyers(fetchedBuyers);
+      setOffers(fetchedOffers);
+      setOrders(fetchedOrders);
+      setShipments(fetchedShipments);
       setDisputes(fetchedDisputes);
+      setNotifications(fetchedNotifs.notifications || []);
+      setUnreadNotificationCount(fetchedNotifs.unread_count || 0);
+
+      // Fetch Cart if buyer
+      if (role === 'BUYER') {
+        const fetchedCart = await apiFetch('/cart').catch(() => null);
+        if (fetchedCart) setCart(fetchedCart);
+      }
+
+      // Format legacy transactions from orders
+      const legacyTxns: TransactionItem[] = fetchedOrders.map((o: any) => ({
+        id: o.id.replace('ORD', 'TXN'),
+        lot_id: o.lot_id,
+        farmer_name: o.farmer_name,
+        buyer_name: o.buyer_name,
+        crop: o.crop,
+        quantity_kg: o.quantity_kg,
+        agreed_price_per_kg: o.price_per_kg,
+        gross_value: o.crop_value,
+        transport_cost: o.transport_cost,
+        net_realization: o.farmer_net_payout,
+        vehicle_number: "UP78 AB 1234",
+        driver_name: "Ravi Kumar",
+        origin: o.pickup_address || "Kanpur",
+        destination: o.delivery_address || "Lucknow",
+        status: o.status === 'PAID' ? 'PAYMENT_COMPLETED' : 'TRANSACTION_CREATED',
+        payment_status: o.payment_status,
+        created_at: o.created_at
+      }));
+      setTransactions(legacyTxns);
+
+      setLastSyncTime(new Date());
 
       // Fetch dynamic recommendation
-      const rec = await apiFetch(`/recommendations?crop=${selectedCrop}&quantity_kg=800&grade=Grade%20A&location=Kanpur`);
+      const rec = await apiFetch(`/recommendations?crop=${selectedCrop}&quantity_kg=800&grade=Grade%20A&location=Kanpur`).catch(() => initialRecommendation);
       setRecommendation(rec);
 
     } catch (error) {
-      console.error("Error refreshing data:", error);
+      console.warn("Refresh data warning:", error);
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
+      setIsSyncing(false);
     }
-  };
+  }, [apiFetch, selectedCrop, role, user]);
 
-  // Refresh data when user, role or selected crop changes
+  // Initial fetch and WebSocket connection
   useEffect(() => {
     refreshData();
-  }, [user, role, selectedCrop]);
+  }, [refreshData]);
+
+  // Real-time WebSocket event listener
+  useEffect(() => {
+    realtimeWS.connect(user?.id, role);
+
+    const unsubscribe = realtimeWS.subscribe((event, data) => {
+      console.log(`[Realtime Event Received] ${event}:`, data);
+
+      if (event === 'LOT_CREATED') {
+        // Prepend new lot to allLots and lots immediately without reload
+        setAllLots(prev => [data, ...prev.filter(l => l.id !== data.id)]);
+        if (role === 'BUYER' || (role === 'FARMER' && data.farmer_name === user?.name)) {
+          setLots(prev => [data, ...prev.filter(l => l.id !== data.id)]);
+        }
+      } else if (event === 'LOT_UPDATED' || event === 'LOT_SOLD') {
+        setAllLots(prev => prev.map(l => l.id === data.id ? { ...l, available_qty_kg: data.available_qty_kg, status: data.status } : l));
+        setLots(prev => prev.map(l => l.id === data.id ? { ...l, available_qty_kg: data.available_qty_kg, status: data.status } : l));
+      } else if (event === 'ORDER_CREATED') {
+        setOrders(prev => [data, ...prev.filter(o => o.id !== data.id)]);
+      } else if (event === 'ORDER_STATUS_CHANGED' || event === 'PAYMENT_UPDATED') {
+        setOrders(prev => prev.map(o => o.id === data.order_id ? { ...o, status: data.status || o.status, payment_status: data.payment_status || o.payment_status } : o));
+      } else if (event === 'LOGISTICS_UPDATED') {
+        setShipments(prev => prev.map(s => s.id === data.shipment_id || s.order_id === data.order_id ? { ...s, status: data.status } : s));
+      } else if (event === 'NOTIFICATION_CREATED') {
+        setNotifications(prev => [{
+          id: Date.now(),
+          title: data.title || 'New Notification',
+          message: data.message || '',
+          type: data.type || 'SYSTEM',
+          is_read: false,
+          created_at: 'Just now'
+        }, ...prev]);
+        setUnreadNotificationCount(prev => prev + 1);
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [user, role]);
 
   const addLot = async (lotData: Partial<LotItem>) => {
     try {
-      await apiFetch('/lots', {
+      const res = await apiFetch('/lots', {
         method: 'POST',
         body: JSON.stringify({
           farmer_name: user?.name || "Ramesh Verma",
@@ -177,17 +260,127 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           variety: lotData.variety || "Desi Red",
           quantity_kg: Number(lotData.quantity_kg) || 800,
           quality_grade: lotData.quality_grade || "Grade A",
-          harvest_date: lotData.harvest_date || "2026-08-23",
-          location: lotData.location || "Kanpur, Uttar Pradesh",
+          harvest_date: lotData.harvest_date || new Date().toISOString().split('T')[0],
+          perishability_window_days: 7,
+          location: lotData.location || user?.location || "Kanpur, Uttar Pradesh",
+          pickup_address: lotData.pickup_address || "Village Bilhaur, Kanpur Rural, UP",
           expected_price_per_kg: Number(lotData.expected_price_per_kg) || 32,
           is_fpo_aggregated: Boolean(lotData.is_fpo_aggregated),
           fpo_name: lotData.fpo_name
         })
       });
-      await refreshData();
+      // Optimistic addition
+      setAllLots(prev => [res, ...prev]);
+      setLots(prev => [res, ...prev]);
     } catch (error) {
       console.error("Failed to add lot:", error);
-      alert("Failed to add lot: " + (error as Error).message);
+      alert("Failed to add crop lot: " + (error as Error).message);
+    }
+  };
+
+  const createOrderDirect = async (lotId: string, quantityKg: number, deliveryAddress: string) => {
+    try {
+      const res = await apiFetch('/orders', {
+        method: 'POST',
+        body: JSON.stringify({
+          lot_id: lotId,
+          quantity_kg: quantityKg,
+          delivery_address: deliveryAddress,
+          buyer_name: user?.name || "FreshHarvest Foods"
+        })
+      });
+      await refreshData(true);
+      return res;
+    } catch (error) {
+      console.error("Order failed:", error);
+      throw error;
+    }
+  };
+
+  const verifyPaymentOrder = async (orderId: string, razorpayOrderId: string, razorpayPaymentId: string, signature: string): Promise<boolean> => {
+    try {
+      const res = await apiFetch('/payments/verify', {
+        method: 'POST',
+        body: JSON.stringify({
+          order_id: orderId,
+          razorpay_order_id: razorpayOrderId,
+          razorpay_payment_id: razorpayPaymentId,
+          razorpay_signature: signature
+        })
+      });
+      await refreshData(true);
+      return res.success;
+    } catch (error) {
+      console.error("Payment verification failed:", error);
+      return false;
+    }
+  };
+
+  const updateShipmentMilestone = async (shipmentId: string, status: string, note?: string) => {
+    try {
+      await apiFetch(`/shipments/${shipmentId}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          status: status,
+          location_note: note
+        })
+      });
+      await refreshData(true);
+    } catch (error) {
+      console.error("Failed to update shipment milestone:", error);
+      alert("Failed to update status: " + (error as Error).message);
+    }
+  };
+
+  const addToCart = async (lotId: string, quantityKg: number) => {
+    try {
+      await apiFetch('/cart/items', {
+        method: 'POST',
+        body: JSON.stringify({ lot_id: lotId, quantity_kg: quantityKg })
+      });
+      const updatedCart = await apiFetch('/cart');
+      setCart(updatedCart);
+    } catch (error) {
+      alert("Failed to add to cart: " + (error as Error).message);
+    }
+  };
+
+  const removeFromCart = async (itemId: number) => {
+    try {
+      await apiFetch(`/cart/items/${itemId}`, { method: 'DELETE' });
+      const updatedCart = await apiFetch('/cart');
+      setCart(updatedCart);
+    } catch (error) {
+      console.error("Failed to remove item:", error);
+    }
+  };
+
+  const markNotificationsRead = async () => {
+    try {
+      await apiFetch('/notifications/read-all', { method: 'POST' });
+      setUnreadNotificationCount(0);
+      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+    } catch (e) {
+      setUnreadNotificationCount(0);
+    }
+  };
+
+  const makeOffer = async (lotId: string, offerPrice: number, quantityKg?: number) => {
+    try {
+      await apiFetch('/offers', {
+        method: 'POST',
+        body: JSON.stringify({
+          lot_id: lotId,
+          buyer_name: user?.name || "FreshHarvest Foods",
+          offered_price_per_kg: offerPrice,
+          quantity_kg: quantityKg || 800,
+          transport_estimate: 1600.0
+        })
+      });
+      await refreshData();
+    } catch (error) {
+      console.error("Failed to submit buyer offer:", error);
+      alert("Failed to make offer: " + (error as Error).message);
     }
   };
 
@@ -203,20 +396,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       await refreshData();
     } catch (error) {
       console.warn("Optimistically updating counteroffer:", error);
-      setOffers(prev => prev.map(o => {
-        if (o.id === offerId || !o.id) {
-          const gross = (o.quantity_kg || 800) * counterPrice;
-          return {
-            ...o,
-            offered_price_per_kg: counterPrice,
-            gross_total: gross,
-            net_realization: gross - (o.transport_estimate || 1600),
-            status: 'COUNTERED' as const,
-            last_counter_by: role
-          };
-        }
-        return o;
-      }));
     }
   };
 
@@ -227,47 +406,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
       await refreshData();
     } catch (error) {
-      console.warn("Optimistically accepting offer:", error);
-      setOffers(prev => prev.map(o => (o.id === offerId || !o.id) ? { ...o, status: 'ACCEPTED' as const } : o));
-      setLots(prev => prev.map(l => ({ ...l, status: 'SOLD' as const })));
-      
-      const acceptedOffer = offers.find(o => o.id === offerId) || {
-        id: offerId || "KL-OFF-8831",
-        lot_id: "KL-10492",
-        crop: "Tomato",
-        buyer_name: "FreshHarvest Foods",
-        offered_price_per_kg: 33.0,
-        quantity_kg: 800.0,
-        transport_estimate: 1600.0,
-        gross_total: 26400.0,
-        net_realization: 24800.0,
-        status: "ACCEPTED" as const,
-        created_at: new Date().toISOString().replace('T', ' ').slice(0, 16)
-      };
-
-      setTransactions(prev => [
-        {
-          id: `KL-TXN-${Date.now().toString().slice(-5)}`,
-          lot_id: acceptedOffer.lot_id,
-          offer_id: acceptedOffer.id,
-          farmer_name: user?.name || "Ramesh Verma",
-          buyer_name: acceptedOffer.buyer_name,
-          crop: acceptedOffer.crop || "Tomato",
-          quantity_kg: acceptedOffer.quantity_kg,
-          agreed_price_per_kg: acceptedOffer.offered_price_per_kg,
-          gross_value: acceptedOffer.gross_total,
-          transport_cost: acceptedOffer.transport_estimate,
-          net_realization: acceptedOffer.net_realization,
-          vehicle_number: "UP78 AB 1234",
-          driver_name: "Ravi Kumar",
-          origin: "Kanpur",
-          destination: "Lucknow",
-          status: "PICKUP_SCHEDULED" as any,
-          payment_status: "ESCROW_LOCKED",
-          created_at: new Date().toISOString().replace('T', ' ').slice(0, 16)
-        },
-        ...prev
-      ]);
+      console.warn("Accept offer error:", error);
     }
   };
 
@@ -284,7 +423,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
       await refreshData();
     } catch (error) {
-      console.error("Failed to raise dispute:", error);
       alert("Failed to raise dispute: " + (error as Error).message);
     }
   };
@@ -306,7 +444,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
       await refreshData();
     } catch (error) {
-      console.error("Failed to add requirement:", error);
       alert("Failed to add requirement: " + (error as Error).message);
     }
   };
@@ -316,10 +453,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       role, setRole,
       language, setLanguage,
       currentTab, setCurrentTab,
-      lots, buyers, offers, transactions, disputes, prices, recommendation,
+      lots, allLots, buyers, offers, orders, cart, shipments, notifications, unreadNotificationCount,
+      transactions, disputes, prices, recommendation,
       selectedCrop, setSelectedCrop, crops,
-      isLoading, refreshData,
-      addLot, counterOffer, acceptOffer, addDispute, addBuyerRequirement
+      isLoading, isSyncing, lastSyncTime, refreshData,
+      addLot, makeOffer, counterOffer, acceptOffer, createOrderDirect, verifyPaymentOrder, updateShipmentMilestone,
+      addToCart, removeFromCart, markNotificationsRead, addDispute, addBuyerRequirement
     }}>
       {children}
     </AppContext.Provider>

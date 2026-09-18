@@ -13,6 +13,7 @@ import { FPODashboardView } from './features/FPODashboardView';
 import { TransactionFlowView } from './features/TransactionFlowView';
 import { AdminCommandCenterView } from './features/AdminCommandCenterView';
 import { AgriOSCommandCenterView } from './features/AgriOSCommandCenterView';
+import { LogisticsDashboardView } from './features/LogisticsDashboardView';
 import { CreateLotWizardModal } from './components/CreateLotWizardModal';
 import { OfferNegotiationModal } from './components/OfferNegotiationModal';
 import { KisanLinkAIAssistant } from './components/KisanLinkAIAssistant';
@@ -41,6 +42,8 @@ const MainContent: React.FC = () => {
             {/* VIEW ROUTER LOGIC */}
             {currentTab === 'agrios' ? (
               <AgriOSCommandCenterView />
+            ) : role === 'LOGISTICS' ? (
+              <LogisticsDashboardView />
             ) : role === 'BUYER' ? (
               <BuyerDashboardView onOpenNegotiation={() => setIsNegotiationOpen(true)} />
             ) : role === 'FPO' ? (

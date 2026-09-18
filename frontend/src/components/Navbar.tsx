@@ -1,14 +1,17 @@
 import React, { useState } from 'react';
-import { Globe, Bell, User as UserIcon, LogOut, ChevronLeft, ArrowLeft } from 'lucide-react';
+import { Globe, Bell, User as UserIcon, LogOut, ChevronLeft, ArrowLeft, RefreshCw } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
+
 import { UserRole, Language } from '../types';
+import { AVAILABLE_LANGUAGES, t } from '../utils/i18n';
 import { AuthModal } from './AuthModal';
 import { NotificationCenter } from './NotificationCenter';
 
 export const Navbar: React.FC = () => {
-  const { role, setRole, language, setLanguage, currentTab, setCurrentTab } = useApp();
+  const { role, setRole, language, setLanguage, currentTab, setCurrentTab, isSyncing, refreshData } = useApp();
   const { user } = useAuth();
+
 
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
@@ -16,17 +19,28 @@ export const Navbar: React.FC = () => {
   // Helper title for mobile screens
   const getMobileTitle = () => {
     switch (currentTab) {
-      case 'overview': return 'Farmer Dashboard';
-      case 'markets': return 'Marketplace';
-      case 'offers': return 'Orders & Logistics';
-      case 'agrios': return 'AgriOS Intelligence';
-      case 'ai-engine': return 'AI Sale Engine';
-      case 'buyers': return 'Verified Buyers';
-      case 'fpo': return 'FPO Bulk Aggregation';
-      case 'admin': return 'Operations Center';
-      default: return 'AgriLink';
+      case 'overview': return t('home', language) + ' — ' + t('roleFarmer', language);
+      case 'markets': return t('markets', language);
+      case 'offers': return t('orders', language);
+      case 'agrios': return t('agrios', language);
+      case 'ai-engine': return t('aiEngine', language);
+      case 'buyers': return t('buyers', language);
+      case 'fpo': return t('fpo', language);
+      case 'admin': return t('admin', language);
+      default: return t('appName', language);
     }
   };
+
+  const navLinks = [
+    { id: 'overview', label: t('home', language) },
+    { id: 'markets', label: t('markets', language) },
+    { id: 'agrios', label: '⚡ ' + t('agrios', language) },
+    { id: 'ai-engine', label: t('aiEngine', language) },
+    { id: 'buyers', label: t('buyers', language) },
+    { id: 'offers', label: t('orders', language) },
+    { id: 'fpo', label: t('fpo', language) },
+    { id: 'admin', label: t('admin', language) }
+  ];
 
   const isSubPage = currentTab !== 'landing' && currentTab !== 'overview';
 
@@ -62,14 +76,14 @@ export const Navbar: React.FC = () => {
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5">
                   <span className="text-lg sm:text-2xl font-black tracking-tight text-white font-sans truncate">
-                    AgriLink
+                    {t('appName', language)}
                   </span>
                   <span className="text-[10px] hidden lg:inline-block font-extrabold px-2 py-0.2 rounded-full bg-agriGreen-light/20 text-freshGreen border border-freshGreen/30">
                     Pro
                   </span>
                 </div>
                 <p className="text-[10px] text-freshGreen font-medium hidden sm:block truncate">
-                  Agricultural Intelligence & Direct Marketplace
+                  {t('appTagline', language)}
                 </p>
                 <span className="text-[11px] text-white/80 font-bold block sm:hidden truncate">
                   {getMobileTitle()}
@@ -80,16 +94,7 @@ export const Navbar: React.FC = () => {
 
           {/* DESKTOP NAVIGATION LINKS (Hidden on Mobile) */}
           <nav className="hidden lg:flex items-center space-x-1">
-            {[
-              { id: 'overview', label: 'Home' },
-              { id: 'markets', label: 'Market' },
-              { id: 'agrios', label: '⚡ AgriOS' },
-              { id: 'ai-engine', label: 'AI Engine' },
-              { id: 'buyers', label: 'Buyers' },
-              { id: 'offers', label: 'Orders' },
-              { id: 'fpo', label: 'FPO' },
-              { id: 'admin', label: 'Admin' }
-            ].map((nav) => (
+            {navLinks.map((nav) => (
               <button
                 key={nav.id}
                 onClick={() => setCurrentTab(nav.id)}
@@ -104,9 +109,21 @@ export const Navbar: React.FC = () => {
             ))}
           </nav>
 
-          {/* RIGHT CONTROLS: ROLE, LANGUAGE & NOTIFICATIONS */}
+          {/* RIGHT CONTROLS: ROLE, SYNC, LANGUAGE & NOTIFICATIONS */}
           <div className="flex items-center space-x-1.5 sm:space-x-2.5 shrink-0">
             
+            {/* Live Sync Indicator & Trigger */}
+            <button
+              onClick={() => refreshData()}
+              disabled={isSyncing}
+              title="Live Data Synchronization (Farmer & Buyer Sync)"
+              className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-forest-light hover:bg-forest-hover border border-white/15 text-[11px] font-bold text-white transition-all"
+            >
+              <span className="w-2 h-2 rounded-full bg-agriGreen animate-ping inline-block" />
+              <RefreshCw className={`w-3.5 h-3.5 text-freshGreen ${isSyncing ? 'animate-spin' : ''}`} />
+              <span className="text-[10px] text-white/90">Live Sync</span>
+            </button>
+
             {/* Role Switcher Dropdown (Compact on Mobile) */}
             <div className="relative flex items-center bg-forest-light rounded-xl px-1.5 py-0.5 sm:px-2 sm:py-1 border border-white/15 shadow-inner">
               <select
@@ -114,24 +131,29 @@ export const Navbar: React.FC = () => {
                 onChange={(e) => setRole(e.target.value as UserRole)}
                 className="bg-transparent text-white text-[11px] sm:text-xs font-bold py-1 focus:outline-none cursor-pointer border-none"
               >
-                <option value="FARMER" className="text-charcoal bg-white">🧑‍🌾 Farmer</option>
-                <option value="BUYER" className="text-charcoal bg-white">🏢 Buyer</option>
-                <option value="FPO" className="text-charcoal bg-white">🚜 FPO</option>
-                <option value="ADMIN" className="text-charcoal bg-white">📊 Admin</option>
+                <option value="FARMER" className="text-charcoal bg-white">{t('roleFarmer', language)}</option>
+                <option value="BUYER" className="text-charcoal bg-white">{t('roleBuyer', language)}</option>
+                <option value="FPO" className="text-charcoal bg-white">{t('roleFpo', language)}</option>
+                <option value="LOGISTICS" className="text-charcoal bg-white">🚚 Logistics Partner</option>
+                <option value="ADMIN" className="text-charcoal bg-white">{t('roleAdmin', language)}</option>
               </select>
             </div>
 
+
             {/* Language Selector */}
             <div className="flex items-center bg-forest-light rounded-xl px-2 py-1 border border-white/15">
-              <Globe className="w-3 h-3 text-freshGreen mr-1 hidden sm:inline-block" />
+              <Globe className="w-3.5 h-3.5 text-freshGreen mr-1.5" />
               <select
                 value={language}
                 onChange={(e) => setLanguage(e.target.value as Language)}
+                aria-label="Select Language"
                 className="bg-transparent text-white text-[11px] sm:text-xs font-bold focus:outline-none cursor-pointer"
               >
-                <option value="EN" className="text-charcoal bg-white">EN</option>
-                <option value="HI" className="text-charcoal bg-white">हिं</option>
-                <option value="MR" className="text-charcoal bg-white">मरा</option>
+                {AVAILABLE_LANGUAGES.map((lang) => (
+                  <option key={lang.code} value={lang.code} className="text-charcoal bg-white font-medium">
+                    {lang.nativeName} ({lang.code})
+                  </option>
+                ))}
               </select>
             </div>
 

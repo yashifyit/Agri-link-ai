@@ -11,7 +11,7 @@ import { FarmerOnboardingModal } from '../components/FarmerOnboardingModal';
 import { CropDetailModal } from '../components/CropDetailModal';
 import { CropImage } from '../components/CropImage';
 import { CROPS_CATALOG, CropItem } from '../data/crops';
-import { t } from '../utils/i18n';
+import { t, getCropName } from '../utils/i18n';
 
 export const FarmerDashboard: React.FC<{ 
   onOpenCreateLot: () => void; 
@@ -20,7 +20,7 @@ export const FarmerDashboard: React.FC<{
   onOpenCreateLot,
   onOpenNegotiation
 }) => {
-  const { recommendation, language, setCurrentTab } = useApp();
+  const { recommendation, lots, language, setCurrentTab } = useApp();
 
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
@@ -59,13 +59,13 @@ export const FarmerDashboard: React.FC<{
           />
           <div className="min-w-0">
             <h1 className="text-lg sm:text-xl font-black text-charcoal truncate">
-              Good morning, Ramesh 👋
+              {t('greetingMorning', language)}, Ramesh 👋
             </h1>
             <div className="flex flex-wrap items-center gap-1.5 text-[11px] sm:text-xs text-charcoal-muted mt-0.5">
               <MapPin className="w-3 h-3 text-agriGreen shrink-0" />
               <span className="font-semibold text-charcoal">Kanpur, UP</span>
               <span className="text-charcoal-muted">•</span>
-              <span className="font-bold text-forest truncate">Lot #KL-10492 Active</span>
+              <span className="font-bold text-forest truncate">Lot #KL-10492 {t('statusActive', language)}</span>
             </div>
           </div>
         </div>
@@ -77,7 +77,7 @@ export const FarmerDashboard: React.FC<{
             className="min-touch px-3 py-2 bg-cream hover:bg-cream-dark active:bg-cream-dark text-charcoal text-xs font-bold rounded-xl border border-agriBorder transition-all flex items-center justify-center gap-1.5 flex-1 sm:flex-initial"
           >
             <Settings2 className="w-4 h-4 text-forest shrink-0" />
-            <span>Manage</span>
+            <span>{t('manage', language)}</span>
           </button>
 
           <button
@@ -86,7 +86,7 @@ export const FarmerDashboard: React.FC<{
             className="min-touch px-4 py-2 bg-agriGreen hover:bg-agriGreen-hover active:scale-95 text-white text-xs font-black rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5 flex-1 sm:flex-initial"
           >
             <PlusCircle className="w-4 h-4 shrink-0" />
-            <span>Sell Crop</span>
+            <span>{t('sellCrop', language)}</span>
           </button>
         </div>
       </div>
@@ -95,13 +95,13 @@ export const FarmerDashboard: React.FC<{
       <div className="space-y-2">
         <div className="flex items-center justify-between px-1">
           <span className="text-xs font-black uppercase text-charcoal tracking-wider">
-            Market Benchmark Snapshot
+            {t('marketSnapshot', language)}
           </span>
           <button 
             onClick={() => setCurrentTab('markets')} 
             className="text-xs font-bold text-forest hover:text-agriGreen flex items-center gap-0.5"
           >
-            See all <ChevronRight className="w-3.5 h-3.5" />
+            {t('seeAll', language)} <ChevronRight className="w-3.5 h-3.5" />
           </button>
         </div>
 
@@ -117,7 +117,7 @@ export const FarmerDashboard: React.FC<{
                   cropName={item.name}
                   className="w-7 h-7 rounded-lg shrink-0"
                 />
-                <span className="font-extrabold text-xs text-charcoal truncate">{item.name}</span>
+                <span className="font-extrabold text-xs text-charcoal truncate">{getCropName(item.name, language)}</span>
               </div>
               <div className="flex items-baseline justify-between pt-0.5">
                 <span className="text-sm font-black text-forest">₹{item.offer}/kg</span>
@@ -149,7 +149,7 @@ export const FarmerDashboard: React.FC<{
           />
           <div className="min-w-0">
             <div className="flex items-baseline gap-2">
-              <h2 className="text-2xl sm:text-3xl font-black text-white truncate">Tomato</h2>
+              <h2 className="text-2xl sm:text-3xl font-black text-white truncate">{getCropName('Tomato', language)}</h2>
               <span className="text-xs text-white/80 shrink-0">800 kg • Grade A</span>
             </div>
             <p className="text-[11px] text-white/70 truncate">Kanpur Hub → FreshHarvest Foods (Lucknow)</p>
@@ -162,7 +162,7 @@ export const FarmerDashboard: React.FC<{
             <span className="text-2xl sm:text-3xl font-black text-freshGreen">₹31.00 <span className="text-xs font-normal text-white/80">/ kg</span></span>
           </div>
           <div className="text-right">
-            <span className="text-[10px] uppercase text-white/70 block">Total Payout</span>
+            <span className="text-[10px] uppercase text-white/70 block">{t('totalPayout', language)}</span>
             <span className="text-lg font-extrabold text-white">₹24,800</span>
           </div>
         </div>
@@ -173,7 +173,7 @@ export const FarmerDashboard: React.FC<{
             aria-label="View Analysis"
             className="min-touch py-2.5 px-3 bg-white/15 hover:bg-white/25 active:bg-white/30 text-white text-xs font-bold rounded-xl border border-white/20 transition-all flex items-center justify-center gap-1"
           >
-            <span>Analysis</span>
+            <span>{t('analysis', language)}</span>
             <ChevronRight className="w-3.5 h-3.5" />
           </button>
 
@@ -182,13 +182,82 @@ export const FarmerDashboard: React.FC<{
             aria-label="Accept Buyer Offer"
             className="min-touch py-2.5 px-3 bg-agriGreen hover:bg-agriGreen-hover active:scale-95 text-white text-xs font-black rounded-xl shadow-md transition-all flex items-center justify-center gap-1"
           >
-            <span>Sell Offer</span>
+            <span>{t('sellOffer', language)}</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
 
-      {/* 4. COMPACT WEATHER & AGRIOS INSIGHT (Requirement 7, 18) */}
+      {/* 4. MY LISTED CROP LOTS (LIVE INVENTORY) */}
+      <div className="bg-white p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-agriBorder shadow-card space-y-3">
+        <div className="flex items-center justify-between border-b border-cream pb-2.5">
+          <div className="flex items-center gap-2">
+            <ShoppingBag className="w-4 h-4 text-forest" />
+            <h3 className="text-sm font-black text-charcoal">My Listed Crop Lots (Live Inventory)</h3>
+          </div>
+          <button
+            onClick={onOpenCreateLot}
+            className="text-xs font-bold text-forest hover:text-agriGreen flex items-center gap-1"
+          >
+            <PlusCircle className="w-3.5 h-3.5" /> List New Lot
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {lots.length === 0 ? (
+            <div className="col-span-2 p-6 text-center text-xs text-charcoal-muted bg-cream rounded-xl">
+              No active listings. Click "Sell Crop Lot" to list your harvest on the live marketplace.
+            </div>
+          ) : (
+            lots.map((lot) => {
+              const available = lot.available_qty_kg !== undefined ? lot.available_qty_kg : lot.quantity_kg;
+              const sold = lot.quantity_kg - available;
+              return (
+                <div key={lot.id} className="p-3.5 bg-cream/80 rounded-2xl border border-agriBorder space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <CropImage cropName={lot.crop} className="w-8 h-8 rounded-lg object-cover" />
+                      <div>
+                        <span className="font-extrabold text-xs text-charcoal">{lot.crop}</span>
+                        <span className="text-[10px] text-charcoal-muted block">{lot.variety} • {lot.quality_grade}</span>
+                      </div>
+                    </div>
+                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                      lot.status === 'SOLD' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
+                    }`}>
+                      {lot.status}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-1.5 text-center text-xs pt-1">
+                    <div className="p-1.5 bg-white rounded-xl border border-agriBorder">
+                      <span className="text-[9px] text-charcoal-muted block">Total Listed</span>
+                      <span className="font-black text-charcoal">{lot.quantity_kg} kg</span>
+                    </div>
+                    <div className="p-1.5 bg-white rounded-xl border border-agriBorder">
+                      <span className="text-[9px] text-agriGreen font-bold block">Remaining</span>
+                      <span className="font-black text-agriGreen">{available} kg</span>
+                    </div>
+                    <div className="p-1.5 bg-white rounded-xl border border-agriBorder">
+                      <span className="text-[9px] text-forest font-bold block">Asking</span>
+                      <span className="font-black text-forest">₹{lot.expected_price_per_kg}/kg</span>
+                    </div>
+                  </div>
+
+                  {sold > 0 && (
+                    <div className="text-[10px] text-amber-800 bg-amber-50 p-1.5 rounded-lg font-bold flex items-center justify-between">
+                      <span>✓ {sold} kg ordered by verified buyers</span>
+                      <span>₹{(sold * lot.expected_price_per_kg).toLocaleString()} in escrow</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+      {/* 5. COMPACT WEATHER & AGRIOS INSIGHT */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         
         {/* COMPACT WEATHER CARD */}

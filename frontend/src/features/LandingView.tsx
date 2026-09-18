@@ -9,7 +9,8 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
-import { t } from '../utils/i18n';
+import { Language } from '../types';
+import { t, AVAILABLE_LANGUAGES } from '../utils/i18n';
 import { fadeUp, fadeIn, scaleIn, staggerContainer, cardHover, buttonPress } from '../utils/animations';
 import { CROPS_CATALOG, CropItem } from '../data/crops';
 import { CropDetailModal } from '../components/CropDetailModal';
@@ -29,7 +30,99 @@ export const LandingView: React.FC<{ onStartSelling: () => void }> = ({ onStartS
   const [weatherRegion, setWeatherRegion] = useState<'kanpur' | 'nashik' | 'pune'>('kanpur');
 
   // Multi-lingual UI swapper demo state
-  const [demoLang, setDemoLang] = useState<'EN' | 'HI' | 'MR'>('EN');
+  const [demoLang, setDemoLang] = useState<Language>('EN');
+
+  const demoCardData: Record<Language, {
+    status: string;
+    farmerLot: string;
+    totalQty: string;
+    expectedPrice: string;
+    harvestDate: string;
+    qualityGrade: string;
+    matched: string;
+  }> = {
+    EN: {
+      status: 'LOT STATUS: ACTIVE',
+      farmerLot: 'Ramesh Verma • Tomato Lot',
+      totalQty: 'Total Quantity',
+      expectedPrice: 'Expected Price',
+      harvestDate: 'Harvest Date',
+      qualityGrade: 'Quality Grade',
+      matched: 'Matched with FreshHarvest Foods at ₹33/kg (+₹2,240 net margin)'
+    },
+    HI: {
+      status: 'लॉट स्थिति: सक्रिय',
+      farmerLot: 'रमेश वर्मा • टमाटर लॉट',
+      totalQty: 'कुल मात्रा',
+      expectedPrice: 'अपेक्षित मूल्य',
+      harvestDate: 'फसल की तारीख',
+      qualityGrade: 'गुणवत्ता ग्रेड',
+      matched: '₹33/किलो पर फ्रेशहार्वेस्ट फूड्स के साथ मिलान किया गया (+₹2,240 शुद्ध लाभ)'
+    },
+    MR: {
+      status: 'लॉट स्थिती: सक्रिय',
+      farmerLot: 'रमेश वर्मा • टोमॅटो लॉट',
+      totalQty: 'एकूण प्रमाण',
+      expectedPrice: 'अपेक्षित किंमत',
+      harvestDate: 'कापणी तारीख',
+      qualityGrade: 'गुणवत्ता श्रेणी',
+      matched: '₹33/किलो दराने फ्रेशहार्वेस्ट फूड्ससोबत व्यवहार जुळला (+₹2,240 निव्वळ नफा)'
+    },
+    PA: {
+      status: 'ਲਾਟ ਸਥਿਤੀ: ਸਰਗਰਮ',
+      farmerLot: 'ਰਮੇਸ਼ ਵਰਮਾ • ਟਮਾਟਰ ਲਾਟ',
+      totalQty: 'ਕੁੱਲ ਮਾਤਰਾ',
+      expectedPrice: 'ਉਮੀਦ ਕੀਤੀ ਕੀਮਤ',
+      harvestDate: 'ਵਾਢੀ ਦੀ ਮਿਤੀ',
+      qualityGrade: 'ਗੁਣਵੱਤਾ ਗ੍ਰੇਡ',
+      matched: '₹33/ਕਿਲੋ ਦਰ ਤੇ ਫਰੈੱਸ਼ ਹਾਰਵੈਸਟ ਫੂਡਜ਼ ਨਾਲ ਸੌਦਾ ਤੈਅ (+₹2,240 ਸ਼ੁੱਧ ਮੁਨਾਫ਼ਾ)'
+    },
+    TE: {
+      status: 'లాట్ స్థితి: సక్రియం',
+      farmerLot: 'రమేష్ వర్మ • టమోటా లాట్',
+      totalQty: 'మొత్తం పరిమాణం',
+      expectedPrice: 'ఆశించిన ధర',
+      harvestDate: 'కోత తేదీ',
+      qualityGrade: 'నాణ్యత గ్రేడ్',
+      matched: '₹33/కిలో వద్ద ఫ్రెష్‌హార్వెస్ట్ ఫుడ్స్‌తో ఖరారు అయింది (+₹2,240 నికర లాభం)'
+    },
+    TA: {
+      status: 'லாட் நிலை: செயலில்',
+      farmerLot: 'ரமேஷ் வர்மா • தக்காளி லாட்',
+      totalQty: 'மொத்த அளவு',
+      expectedPrice: 'எதிர்பார்க்கப்படும் விலை',
+      harvestDate: 'அறுவடை தேதி',
+      qualityGrade: 'தர வகை',
+      matched: '₹33/கிலோ விலையில் ஃப்ரெஷ்ஹார்வெஸ்ட் ஃபுட்ஸ் நிறுவனத்துடன் இணைக்கப்பட்டது (+₹2,240 நிகர லாபம்)'
+    },
+    GU: {
+      status: 'લોટ સ્થિતિ: સક્રિય',
+      farmerLot: 'રમેશ વર્મા • ટામેટા લોટ',
+      totalQty: 'કુલ જથ્થો',
+      expectedPrice: 'અપેક્ષિત ભાવ',
+      harvestDate: 'લણણી તારીખ',
+      qualityGrade: 'ગુણવત્તા ગ્રેડ',
+      matched: '₹33/કિલોના ભાવે ફ્રેશહાર્વેસ્ટ ફૂડ્સ સાથે મેળ મળ્યો (+₹2,240 ચોખ્ખો નફો)'
+    },
+    KN: {
+      status: 'ಲಾಟ್ ಸ್ಥಿತಿ: ಸಕ್ರಿಯ',
+      farmerLot: 'ರಮೇಶ್ ವರ್ಮಾ • ಟೊಮೆಟೊ ಲಾಟ್',
+      totalQty: 'ಒಟ್ಟು ಪ್ರಮಾಣ',
+      expectedPrice: 'ನಿರೀಕ್ಷಿತ ಬೆಲೆ',
+      harvestDate: 'ಕೊಯ್ಲು ದಿನಾಂಕ',
+      qualityGrade: 'ಗುಣಮಟ್ಟ ಗ್ರೇಡ್',
+      matched: '₹33/ಕೆಜಿ ದರದಲ್ಲಿ ಫ್ರೆಶ್‌ಹಾರ್ವೆಸ್ಟ್ ಫುಡ್ಸ್ ಜೊತೆ ಹೊಂದಾಣಿಕೆಯಾಗಿದೆ (+₹2,240 ನಿವ್ವಳ ಲಾಭ)'
+    },
+    BN: {
+      status: 'লট স্থিতি: সক্রিয়',
+      farmerLot: 'রমেশ বর্মা • টমেটো লট',
+      totalQty: 'মোট পরিমাণ',
+      expectedPrice: 'প্রত্যাশিত মূল্য',
+      harvestDate: 'ফসল কাটার তারিখ',
+      qualityGrade: 'গুণমান গ্রেড',
+      matched: '₹৩৩/কেজি দরে ফ্রেশহার্ভেস্ট ফুডস-এর সাথে সফল চুক্তি (+₹২,২৪০ নিট লাভ)'
+    }
+  };
 
 
 
@@ -281,19 +374,19 @@ export const LandingView: React.FC<{ onStartSelling: () => void }> = ({ onStartS
               </p>
             </div>
 
-            {/* SWITCHER CONTROLS */}
-            <div className="flex gap-2 p-1.5 bg-cream rounded-2xl border border-agriBorder self-start inline-flex">
-              {(['EN', 'HI', 'MR'] as const).map((lang) => (
+            {/* SWITCHER CONTROLS (All 9 Regional Languages) */}
+            <div className="flex flex-wrap gap-1.5 p-1.5 bg-cream rounded-2xl border border-agriBorder self-start">
+              {AVAILABLE_LANGUAGES.map((lang) => (
                 <button
-                  key={lang}
-                  onClick={() => setDemoLang(lang)}
-                  className={`px-4 py-2 text-xs font-black rounded-xl transition-all ${
-                    demoLang === lang 
+                  key={lang.code}
+                  onClick={() => setDemoLang(lang.code)}
+                  className={`px-3 py-1.5 text-xs font-black rounded-xl transition-all ${
+                    demoLang === lang.code 
                       ? 'bg-forest text-white shadow-md' 
-                      : 'text-charcoal-muted hover:text-charcoal'
+                      : 'text-charcoal-muted hover:text-charcoal bg-white/60'
                   }`}
                 >
-                  {lang === 'EN' ? 'English' : lang === 'HI' ? 'हिंदी (Hindi)' : 'मराठी (Marathi)'}
+                  {lang.nativeName} ({lang.code})
                 </button>
               ))}
             </div>
@@ -309,10 +402,10 @@ export const LandingView: React.FC<{ onStartSelling: () => void }> = ({ onStartS
               <div className="flex justify-between items-center pb-3 border-b border-agriBorder">
                 <div>
                   <span className="text-[10px] font-extrabold text-agriGreen uppercase">
-                    {demoLang === 'EN' ? 'LOT STATUS: ACTIVE' : demoLang === 'HI' ? 'लॉट स्थिति: सक्रिय' : 'लॉट स्थिती: सक्रिय'}
+                    {(demoCardData[demoLang] || demoCardData.EN).status}
                   </span>
                   <h4 className="text-base font-black text-charcoal">
-                    {demoLang === 'EN' ? 'Ramesh Verma • Tomato Lot' : demoLang === 'HI' ? 'रमेश वर्मा • टमाटर लॉट' : 'रमेश वर्मा • टोमॅटो लॉट'}
+                    {(demoCardData[demoLang] || demoCardData.EN).farmerLot}
                   </h4>
                 </div>
                 <div className="bg-forest text-white px-3 py-1 rounded text-[10px] font-bold">
@@ -323,36 +416,32 @@ export const LandingView: React.FC<{ onStartSelling: () => void }> = ({ onStartS
               <div className="grid grid-cols-2 gap-4 text-xs font-bold text-charcoal">
                 <div>
                   <span className="text-charcoal-muted block text-[9px] uppercase font-extrabold">
-                    {demoLang === 'EN' ? 'Total Quantity' : demoLang === 'HI' ? 'कुल मात्रा' : 'एकूण प्रमाण'}
+                    {(demoCardData[demoLang] || demoCardData.EN).totalQty}
                   </span>
                   <span className="text-sm font-black">800 KG</span>
                 </div>
                 <div>
                   <span className="text-charcoal-muted block text-[9px] uppercase font-extrabold">
-                    {demoLang === 'EN' ? 'Expected Price' : demoLang === 'HI' ? 'अपेक्षित मूल्य' : 'अपेक्षित किंमत'}
+                    {(demoCardData[demoLang] || demoCardData.EN).expectedPrice}
                   </span>
                   <span className="text-sm font-black">₹32.00 / kg</span>
                 </div>
                 <div>
                   <span className="text-charcoal-muted block text-[9px] uppercase font-extrabold">
-                    {demoLang === 'EN' ? 'Harvest Date' : demoLang === 'HI' ? 'फसल की तारीख' : 'कापणी तारीख'}
+                    {(demoCardData[demoLang] || demoCardData.EN).harvestDate}
                   </span>
                   <span className="text-sm font-black">23-Aug-2026</span>
                 </div>
                 <div>
                   <span className="text-charcoal-muted block text-[9px] uppercase font-extrabold">
-                    {demoLang === 'EN' ? 'Quality Grade' : demoLang === 'HI' ? 'गुणवत्ता ग्रेड' : 'गुणवत्ता श्रेणी'}
+                    {(demoCardData[demoLang] || demoCardData.EN).qualityGrade}
                   </span>
                   <span className="text-sm font-black text-agriGreen">Grade A</span>
                 </div>
               </div>
 
               <div className="p-3 bg-agriGreen-light rounded-xl border border-agriGreen-accent/25 text-[11px] text-forest font-semibold">
-                ✓ {demoLang === 'EN' 
-                  ? 'Matched with FreshHarvest Foods at ₹33/kg (+₹2,240 net margin)' 
-                  : demoLang === 'HI' 
-                  ? '₹33/किलो पर फ्रेशहार्वेस्ट फूड्स के साथ मिलान किया गया (+₹2,240 शुद्ध लाभ)' 
-                  : '₹33/किलो दराने फ्रेशहार्वेस्ट फूड्ससोबत व्यवहार जुळला (+₹2,240 निव्वळ नफा)'}
+                ✓ {(demoCardData[demoLang] || demoCardData.EN).matched}
               </div>
             </motion.div>
           </div>

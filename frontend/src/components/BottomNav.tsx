@@ -1,16 +1,17 @@
 import React from 'react';
 import { Home, ShoppingBag, Plus, Package, Cpu } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { t } from '../utils/i18n';
 
 export const BottomNav: React.FC<{ onOpenCreateLot: () => void }> = ({ onOpenCreateLot }) => {
-  const { currentTab, setCurrentTab } = useApp();
+  const { currentTab, setCurrentTab, language } = useApp();
 
   const navItems = [
-    { id: 'overview', label: 'Home', icon: Home },
-    { id: 'markets', label: 'Market', icon: ShoppingBag },
-    { id: 'sell', label: 'Sell', icon: Plus, isAction: true },
-    { id: 'offers', label: 'Orders', icon: Package },
-    { id: 'agrios', label: 'AgriOS', icon: Cpu, isAgriOS: true },
+    { id: 'overview', label: t('home', language), icon: Home },
+    { id: 'markets', label: t('markets', language), icon: ShoppingBag },
+    { id: 'sell', label: t('sell', language), icon: Plus, isAction: true },
+    { id: 'offers', label: t('orders', language), icon: Package },
+    { id: 'agrios', label: t('agrios', language), icon: Cpu, isAgriOS: true },
   ];
 
   return (

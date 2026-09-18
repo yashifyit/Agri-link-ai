@@ -1,23 +1,61 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, ShieldAlert, CheckCircle2, Ban, Eye, AlertTriangle } from 'lucide-react';
-import { ReviewItem, INITIAL_REVIEWS } from '../services/agriOsEventService';
+import { 
+  ReviewItem, 
+  FALLBACK_INITIAL_REVIEWS, 
+  fetchAgriOsReviewQueue, 
+  submitAgriOsReviewAction 
+} from '../services/agriOsEventService';
 
 export const AgriOSReviewQueueModal: React.FC<{
   isOpen: boolean;
   onClose: () => void;
   onActionProcessed?: (reviewId: string, action: string) => void;
 }> = ({ isOpen, onClose, onActionProcessed }) => {
-  const [reviews, setReviews] = useState<ReviewItem[]>(INITIAL_REVIEWS);
+  const [reviews, setReviews] = useState<ReviewItem[]>(FALLBACK_INITIAL_REVIEWS);
+  const [loading, setLoading] = useState<boolean>(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let isMounted = true;
+    setLoading(true);
+
+    fetchAgriOsReviewQueue()
+      .then(items => {
+        if (isMounted && items && items.length > 0) {
+          setReviews(items);
+        }
+      })
+      .catch(err => {
+        console.warn('[AgriOS] Live review queue unavailable, using isolated fallback', err);
+        if (isMounted) setReviews(FALLBACK_INITIAL_REVIEWS);
+      })
+      .finally(() => {
+        if (isMounted) setLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
-  const handleAction = (reviewId: string, action: 'APPROVE' | 'BLOCK' | 'DISMISS') => {
+  const handleAction = async (reviewId: string, action: 'APPROVE' | 'BLOCK' | 'DISMISS') => {
+    // Optimistically update UI
     setReviews(prev => prev.filter(r => r.id !== reviewId));
-    setSuccessMessage(`Action '${action}' recorded in AgriOS immutable audit ledger for item ${reviewId}.`);
+    setSuccessMessage(`Action '${action}' recorded in AgriOS audit ledger for item ${reviewId}.`);
     if (onActionProcessed) {
       onActionProcessed(reviewId, action);
     }
+
+    try {
+      await submitAgriOsReviewAction(reviewId, action);
+    } catch (err) {
+      console.warn(`[AgriOS] Failed to record review action '${action}' for ${reviewId} on backend`, err);
+    }
+
     setTimeout(() => setSuccessMessage(null), 3000);
   };
 

@@ -726,7 +726,7 @@ def get_human_review_queue():
     ]
 
 @router.post("/review/{review_id}/action")
-def process_review_action(review_id: str, action: str = Query(..., regex="^(APPROVE|BLOCK|DISMISS)$")):
+def process_review_action(review_id: str, action: str = Query(..., pattern="^(APPROVE|BLOCK|DISMISS)$")):
     return {
         "review_id": review_id,
         "action": action,

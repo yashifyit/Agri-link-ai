@@ -85,25 +85,31 @@ export const AuthModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ 
                 onClick={() => handleDemoClick('FARMER')}
                 className="p-2 bg-white/10 hover:bg-white/20 rounded-xl font-semibold text-white border border-white/15 text-left transition-all"
               >
-                👨‍🌾 Farmer View
+                👨‍🌾 Farmer
               </button>
               <button
                 onClick={() => handleDemoClick('BUYER')}
                 className="p-2 bg-white/10 hover:bg-white/20 rounded-xl font-semibold text-white border border-white/15 text-left transition-all"
               >
-                🏢 Buyer View
+                🏢 Buyer
               </button>
               <button
                 onClick={() => handleDemoClick('FPO')}
                 className="p-2 bg-white/10 hover:bg-white/20 rounded-xl font-semibold text-white border border-white/15 text-left transition-all"
               >
-                🚜 FPO View
+                🚜 FPO
+              </button>
+              <button
+                onClick={() => handleDemoClick('LOGISTICS')}
+                className="p-2 bg-white/10 hover:bg-white/20 rounded-xl font-semibold text-white border border-white/15 text-left transition-all"
+              >
+                🚚 Logistics
               </button>
               <button
                 onClick={() => handleDemoClick('ADMIN')}
-                className="p-2 bg-white/10 hover:bg-white/20 rounded-xl font-semibold text-white border border-white/15 text-left transition-all"
+                className="col-span-2 p-2 bg-white/10 hover:bg-white/20 rounded-xl font-semibold text-white border border-white/15 text-center transition-all"
               >
-                📊 Command Ctr
+                📊 AgriOS Command Center
               </button>
             </div>
           </div>

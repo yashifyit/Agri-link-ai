@@ -1,3 +1,5 @@
+import { apiGet, apiPost } from './apiClient';
+
 export interface KafkaTopic {
   id: string;
   domain: 'MARKET' | 'WEATHER' | 'SOIL' | 'WATER' | 'CROP' | 'LOGISTICS' | 'LIVESTOCK' | 'MARKETPLACE' | 'KNOWLEDGE' | 'SAFETY';
@@ -62,8 +64,8 @@ export interface SystemStatus {
   lastEventSecondsAgo: number;
 }
 
-// 135 structured topics across 10 domains
-export const KAFKA_TOPICS: KafkaTopic[] = [
+// 135 structured topics across 10 domains (isolated fallback catalog)
+export const FALLBACK_KAFKA_TOPICS: KafkaTopic[] = [
   // MARKET (16)
   { id: "market.price.updated", domain: "MARKET", description: "Real-time modal price updates from APMC mandis", partitions: 12, retention_hrs: 72 },
   { id: "market.mandi.updated", domain: "MARKET", description: "Arrival volumes and market operational status", partitions: 8, retention_hrs: 48 },
@@ -220,7 +222,9 @@ export const KAFKA_TOPICS: KafkaTopic[] = [
   { id: "safety.emergency.halt.tripped", domain: "SAFETY", description: "Circuit breaker triggered for market or environmental anomaly", partitions: 4, retention_hrs: 720 }
 ];
 
-export const DOMAIN_AGENTS_INITIAL: DomainAgent[] = [
+export const KAFKA_TOPICS = FALLBACK_KAFKA_TOPICS;
+
+export const FALLBACK_DOMAIN_AGENTS: DomainAgent[] = [
   {
     id: "agent-market-intel",
     name: "Market Intelligence Agent",
@@ -559,7 +563,9 @@ export const DOMAIN_AGENTS_INITIAL: DomainAgent[] = [
   }
 ];
 
-export const INITIAL_REVIEWS: ReviewItem[] = [
+export const DOMAIN_AGENTS_INITIAL = FALLBACK_DOMAIN_AGENTS;
+
+export const FALLBACK_INITIAL_REVIEWS: ReviewItem[] = [
   {
     id: "rev-101",
     title: "High Weather Risk Tomato Harvest Scheduling",
@@ -713,3 +719,46 @@ export const EVENT_CAUSAL_PATTERNS = [
     }
   ]
 ];
+
+export const INITIAL_REVIEWS = FALLBACK_INITIAL_REVIEWS;
+
+// --- Live AgriOS Backend API Integration ---
+
+export async function fetchAgriOsStatus(): Promise<SystemStatus> {
+  return apiGet<SystemStatus>('/agrios/status');
+}
+
+export async function fetchAgriOsTopics(domain?: string): Promise<KafkaTopic[]> {
+  const query = domain && domain !== 'ALL' ? `?domain=${encodeURIComponent(domain)}` : '';
+  return apiGet<KafkaTopic[]>(`/agrios/topics${query}`);
+}
+
+export async function fetchAgriOsAgents(): Promise<DomainAgent[]> {
+  const raw = await apiGet<any[]>('/agrios/agents');
+  return raw.map(ag => ({
+    ...ag,
+    lastActivity: ag.lastActivity || 'Just now',
+  }));
+}
+
+export async function fetchAgriOsEvents(limit: number = 25): Promise<AgriEvent[]> {
+  return apiGet<AgriEvent[]>(`/agrios/events?limit=${limit}`);
+}
+
+export async function fetchAgriOsReviewQueue(): Promise<ReviewItem[]> {
+  return apiGet<ReviewItem[]>('/agrios/review-queue');
+}
+
+export async function submitAgriOsReviewAction(
+  reviewId: string, 
+  action: 'APPROVE' | 'BLOCK' | 'DISMISS'
+): Promise<{ review_id: string; action: string; processed_at: string; status: string }> {
+  return apiPost(`/agrios/review/${encodeURIComponent(reviewId)}/action?action=${action}`);
+}
+
+export async function requestPriceRecommendation(
+  crop: string, 
+  quantityKg: number
+): Promise<any> {
+  return apiPost('/agrios/recommend-price', { crop, quantity_kg: quantityKg });
+}
